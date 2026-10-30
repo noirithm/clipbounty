@@ -1,4 +1,5 @@
 import tmi from "tmi.js";
+import { captureBugClip } from "./clip-capture.js";
 
 type ChatTags = { username?: string };
 
@@ -24,13 +25,22 @@ export async function startChatListener(
   client: ChatClient = new tmi.Client({ channels: channel ? [channel] : [] }),
   log: (line: string) => void = console.log,
   now: () => Date = () => new Date(),
+  onBug: (viewer: string, timestamp: Date) => Promise<unknown> = (viewer, timestamp) =>
+    captureBugClip(viewer, timestamp),
 ): Promise<ChatClient> {
   if (!channel) {
     throw new Error("TWITCH_CHANNEL must be set");
   }
 
   client.on("message", (messageChannel, tags, message) => {
-    log(formatChatMessage(messageChannel, tags.username ?? "unknown", message, now()));
+    const timestamp = now();
+    const username = tags.username ?? "unknown";
+    log(formatChatMessage(messageChannel, username, message, timestamp));
+    if (/^!bug\s+\S[\s\S]*$/i.test(message)) {
+      void onBug(username, timestamp).catch((error: unknown) => {
+        log(`Failed to capture bug clip: ${error instanceof Error ? error.message : String(error)}`);
+      });
+    }
   });
   await client.connect();
   return client;
