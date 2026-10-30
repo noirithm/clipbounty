@@ -1,0 +1,20 @@
+{
+  "name": "clipbounty",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/server.ts",
+    "test": "node --import tsx --test $(find test -name '*.test.ts')"
+  },
+  "dependencies": {
+    "tmi.js": "^1.8.5",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "tsx": "^4.19.0",
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.0"
+  }
+}
