@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx --env-file=.env src/server.ts",
-    "test": "node --import tsx --test $(find test -name '*.test.ts')"
+    "test": "node --import tsx --test $(find test -name '*.test.ts')",
+    "harness": "tsx scripts/test-harness.ts"
   },
   "dependencies": {
     "tmi.js": "^1.8.5",

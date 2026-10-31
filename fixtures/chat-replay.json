@@ -1,0 +1,8 @@
+{
+  "messages": [
+    { "at_ms": 0, "viewer": "pixelpilot", "text": "hello chat", "flagged": false },
+    { "at_ms": 250, "viewer": "pixelpilot", "text": "!bug player falls through floor", "flagged": true },
+    { "at_ms": 500, "viewer": "mapmaker", "text": "nice level", "flagged": false },
+    { "at_ms": 750, "viewer": "mapmaker", "text": "!BUG door stays locked", "flagged": true }
+  ]
+}
