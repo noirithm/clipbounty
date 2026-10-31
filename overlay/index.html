@@ -10,18 +10,19 @@
     body { margin: 0; padding: 20px; color: #f5f7fb; background: transparent; }
     .panel { width: 340px; padding: 18px; border: 1px solid #ffffff24; border-radius: 16px; background: #111722ed; box-shadow: 0 12px 40px #0008; }
     h1 { margin: 0 0 14px; font-size: 19px; letter-spacing: .04em; text-transform: uppercase; }
-    #claim { min-height: 0; margin: 0; overflow: hidden; color: #80f0b5; font-size: 16px; font-weight: 750; }
+    #claim { min-height: 0; margin: 0; overflow: hidden; color: #80f0b5; font-size: 16px; font-weight: 750; text-shadow: 0 0 18px #55e89a66; }
     #claim:not(:empty) { margin: 0 0 12px; }
-    #claim.play { animation: claim-pop 2.4s ease both; }
+    #claim.play { animation: claim-pop 1.9s cubic-bezier(.2,.8,.2,1) both; }
     ol { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
     li { display: flex; justify-content: space-between; padding: 9px 11px; border-radius: 9px; background: #ffffff0c; }
     li:first-child { color: #ffe28a; background: #ffe28a16; }
     .score { color: #aebbd0; font-variant-numeric: tabular-nums; }
     #empty { margin: 0; color: #aebbd0; font-size: 14px; }
     @keyframes claim-pop {
-      0% { opacity: 0; transform: translateY(10px) scale(.96); }
-      12%, 78% { opacity: 1; transform: translateY(0) scale(1); }
-      100% { opacity: 0; transform: translateY(-5px); }
+      0% { opacity: 0; filter: blur(4px); transform: translateY(12px) scale(.92); }
+      14% { opacity: 1; filter: blur(0); transform: translateY(0) scale(1.04); }
+      22%, 78% { opacity: 1; transform: translateY(0) scale(1); }
+      100% { opacity: 0; transform: translateY(-7px) scale(.98); }
     }
     @media (prefers-reduced-motion: reduce) { #claim.play { animation-duration: .01ms; } }
   </style>
@@ -37,6 +38,63 @@
     const claim = document.querySelector("#claim");
     const scores = document.querySelector("#scores");
     const empty = document.querySelector("#empty");
+    let audioContext;
+    let audioUnlocked = false;
+    let resumePending = false;
+
+    try {
+      audioContext = new AudioContext({ latencyHint: "interactive" });
+      if (audioContext.state !== "suspended") void audioContext.suspend().catch(() => {});
+    } catch {
+      // Audio may be unavailable in the browser source.
+    }
+
+    async function resumeAudioFromInput() {
+      if (!audioContext || audioUnlocked || resumePending) return;
+      resumePending = true;
+      try {
+        await audioContext.resume();
+        if (audioContext.state === "running") {
+          audioUnlocked = true;
+          document.removeEventListener("click", resumeAudioFromInput);
+          document.removeEventListener("keydown", resumeAudioFromInput);
+        }
+      } catch {
+        // Keep the input listeners so a later gesture can try again.
+      } finally {
+        resumePending = false;
+      }
+    }
+
+    document.addEventListener("click", resumeAudioFromInput);
+    document.addEventListener("keydown", resumeAudioFromInput);
+
+    function playClaimCue() {
+      try {
+        const context = audioContext;
+        if (!context || !audioUnlocked || context.state !== "running") return;
+        const playNotes = () => {
+          const start = context.currentTime + 0.015;
+          [660, 880].forEach((frequency, index) => {
+            const noteStart = start + index * 0.095;
+            const oscillator = context.createOscillator();
+            const gain = context.createGain();
+            oscillator.type = "sine";
+            oscillator.frequency.setValueAtTime(frequency, noteStart);
+            gain.gain.setValueAtTime(0.0001, noteStart);
+            gain.gain.exponentialRampToValueAtTime(0.5, noteStart + 0.018);
+            gain.gain.exponentialRampToValueAtTime(0.0001, noteStart + 0.17);
+            oscillator.connect(gain);
+            gain.connect(context.destination);
+            oscillator.start(noteStart);
+            oscillator.stop(noteStart + 0.18);
+          });
+        };
+        playNotes();
+      } catch {
+        // Audio may be unavailable in the browser source.
+      }
+    }
 
     function renderLeaderboard(leaderboard) {
       const ranked = Object.entries(leaderboard)
@@ -66,6 +124,7 @@
           claim.classList.remove("play");
           void claim.offsetWidth;
           claim.classList.add("play");
+          playClaimCue();
           renderLeaderboard(update.leaderboard);
         } catch (error) {
           console.error("Invalid ClipBounty update", error);
