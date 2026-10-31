@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ClipBounty overlay</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 20px; color: #f5f7fb; background: transparent; }
+    .panel { width: 340px; padding: 18px; border: 1px solid #ffffff24; border-radius: 16px; background: #111722ed; box-shadow: 0 12px 40px #0008; }
+    h1 { margin: 0 0 14px; font-size: 19px; letter-spacing: .04em; text-transform: uppercase; }
+    #claim { min-height: 0; margin: 0; overflow: hidden; color: #80f0b5; font-size: 16px; font-weight: 750; }
+    #claim:not(:empty) { margin: 0 0 12px; }
+    #claim.play { animation: claim-pop 2.4s ease both; }
+    ol { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+    li { display: flex; justify-content: space-between; padding: 9px 11px; border-radius: 9px; background: #ffffff0c; }
+    li:first-child { color: #ffe28a; background: #ffe28a16; }
+    .score { color: #aebbd0; font-variant-numeric: tabular-nums; }
+    #empty { margin: 0; color: #aebbd0; font-size: 14px; }
+    @keyframes claim-pop {
+      0% { opacity: 0; transform: translateY(10px) scale(.96); }
+      12%, 78% { opacity: 1; transform: translateY(0) scale(1); }
+      100% { opacity: 0; transform: translateY(-5px); }
+    }
+    @media (prefers-reduced-motion: reduce) { #claim.play { animation-duration: .01ms; } }
+  </style>
+</head>
+<body>
+  <main class="panel" aria-live="polite">
+    <h1>Bug bounty leaderboard</h1>
+    <p id="claim"></p>
+    <ol id="scores"></ol>
+    <p id="empty">Waiting for the first confirmed bounty…</p>
+  </main>
+  <script>
+    const claim = document.querySelector("#claim");
+    const scores = document.querySelector("#scores");
+    const empty = document.querySelector("#empty");
+
+    function renderLeaderboard(leaderboard) {
+      const ranked = Object.entries(leaderboard)
+        .filter(([, score]) => Number.isFinite(score))
+        .sort(([nameA, scoreA], [nameB, scoreB]) => scoreB - scoreA || nameA.localeCompare(nameB));
+      scores.replaceChildren(...ranked.map(([viewer, score]) => {
+        const row = document.createElement("li");
+        const name = document.createElement("span");
+        const points = document.createElement("span");
+        name.textContent = viewer;
+        points.textContent = `${score} ${score === 1 ? "claim" : "claims"}`;
+        points.className = "score";
+        row.append(name, points);
+        return row;
+      }));
+      empty.hidden = ranked.length > 0;
+    }
+
+    function connect() {
+      const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+      const socket = new WebSocket(`${protocol}//${location.host}/ws`);
+      socket.addEventListener("message", (event) => {
+        try {
+          const update = JSON.parse(event.data);
+          if (update.type !== "confirmed" || typeof update.viewer !== "string" || !update.leaderboard) return;
+          claim.textContent = `${update.viewer} claimed a bounty!`;
+          claim.classList.remove("play");
+          void claim.offsetWidth;
+          claim.classList.add("play");
+          renderLeaderboard(update.leaderboard);
+        } catch (error) {
+          console.error("Invalid ClipBounty update", error);
+        }
+      });
+      socket.addEventListener("close", () => setTimeout(connect, 1500));
+    }
+
+    connect();
+  </script>
+</body>
+</html>

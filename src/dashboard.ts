@@ -1,4 +1,4 @@
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import { confirmQueueEntry, readQueue, type QueueEntry } from "./queue-store.js";
 
 function escapeHtml(value: string): string {
@@ -37,11 +37,22 @@ function send(response: ServerResponse, status: number, body: string, contentTyp
   response.end(body);
 }
 
-export function createDashboardServer(options: {
+export interface DashboardOptions {
   queuePath?: string;
   leaderboardPath?: string;
-} = {}) {
-  return createServer(async (request: IncomingMessage, response: ServerResponse) => {
+}
+
+export interface ConfirmationEvent {
+  type: "confirmed";
+  viewer: string;
+  leaderboard: Record<string, number>;
+}
+
+export function createDashboardHandler(
+  options: DashboardOptions = {},
+  publish: (event: ConfirmationEvent) => void = () => {},
+) {
+  return async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
     const url = new URL(request.url ?? "/", "http://localhost");
     if (request.method === "GET" && url.pathname === "/") {
       try {
@@ -57,11 +68,12 @@ export function createDashboardServer(options: {
       let id: string;
       try {
         id = decodeURIComponent(confirmMatch[1]);
-        const confirmed = await confirmQueueEntry(id, options.queuePath, options.leaderboardPath);
-        if (!confirmed) {
+        const update = await confirmQueueEntry(id, options.queuePath, options.leaderboardPath);
+        if (!update) {
           send(response, 404, "Pending queue entry not found");
           return;
         }
+        publish({ type: "confirmed", ...update });
         response.writeHead(303, { Location: "/" });
         response.end();
       } catch (error) {
@@ -71,5 +83,5 @@ export function createDashboardServer(options: {
     }
 
     send(response, 404, "Not found");
-  });
+  };
 }
